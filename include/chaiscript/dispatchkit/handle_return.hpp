@@ -1,7 +1,7 @@
 // This file is distributed under the BSD License.
 // See "license.txt" for details.
 // Copyright 2009-2012, Jonathan Turner (jonathan@emptycrate.com)
-// Copyright 2009-2017, Jason Turner (jason@emptycrate.com)
+// Copyright 2009-2018, Jason Turner (jason@emptycrate.com)
 // http://www.chaiscript.com
 
 // This is an open source non-commercial project. Dear PVS-Studio, please check it.
@@ -36,14 +36,14 @@ namespace chaiscript
         struct Handle_Return
         {
           template<typename T,
-                   typename = typename std::enable_if<std::is_pod<typename std::decay<T>::type>::value>::type>
+                   typename = std::enable_if_t<std::is_pod_v<std::decay_t<T>>>>
           static Boxed_Value handle(T r)
           {
             return Boxed_Value(std::move(r), true);
           }
 
           template<typename T,
-                   typename = typename std::enable_if<!std::is_pod<typename std::decay<T>::type>::value>::type>
+                   typename = std::enable_if_t<!std::is_pod_v<std::decay_t<T>>>>
           static Boxed_Value handle(T &&r)
           {
             return Boxed_Value(std::make_shared<T>(std::forward<T>(r)), true);
@@ -167,23 +167,39 @@ namespace chaiscript
           }
         };
 
-
-
-      template<typename Ret>
-        struct Handle_Return<const Ret &>
+      template<typename Ret, bool Ptr>
+        struct Handle_Return_Ref
         {
-          static Boxed_Value handle(const Ret &r)
+          template<typename T>
+          static Boxed_Value handle(T &&r)
           {
             return Boxed_Value(std::cref(r), true);
           }
         };
 
       template<typename Ret>
+        struct Handle_Return_Ref<Ret, true>
+        {
+          template<typename T>
+          static Boxed_Value handle(T &&r)
+          {
+            return Boxed_Value(typename std::remove_reference<decltype(r)>::type{r}, true);
+          }
+        };
+
+      template<typename Ret>
+        struct Handle_Return<const Ret &> : Handle_Return_Ref<const Ret &, std::is_pointer<typename std::remove_reference<const Ret &>::type>::value>
+        {
+
+        };
+
+
+      template<typename Ret>
         struct Handle_Return<const Ret>
         {
-          static Boxed_Value handle(const Ret &r)
+          static Boxed_Value handle(Ret r)
           {
-            return Boxed_Value(std::cref(r));
+            return Boxed_Value(std::move(r));
           }
         };
 
@@ -199,7 +215,7 @@ namespace chaiscript
       template<>
         struct Handle_Return<Boxed_Value>
         {
-          static Boxed_Value handle(const Boxed_Value &r)
+          static Boxed_Value handle(const Boxed_Value &r) noexcept
           {
             return r;
           }
@@ -226,7 +242,7 @@ namespace chaiscript
       template<>
         struct Handle_Return<Boxed_Number>
         {
-          static Boxed_Value handle(const Boxed_Number &r)
+          static Boxed_Value handle(const Boxed_Number &r) noexcept
           {
             return r.bv;
           }

@@ -1,7 +1,7 @@
 // This file is distributed under the BSD License.
 // See "license.txt" for details.
 // Copyright 2009-2012, Jonathan Turner (jonathan@emptycrate.com)
-// Copyright 2009-2017, Jason Turner (jason@emptycrate.com)
+// Copyright 2009-2018, Jason Turner (jason@emptycrate.com)
 // http://www.chaiscript.com
 
 // This is an open source non-commercial project. Dear PVS-Studio, please check it.
@@ -19,14 +19,15 @@ namespace chaiscript
   {
     namespace detail
     {
-
       template<typename Class, typename ... Params  >
         Proxy_Function build_constructor_(Class (*)(Params...))
         {
-          auto call = dispatch::detail::Constructor<Class, Params...>();
+          auto call = [](auto && ... param){
+            return Class(std::forward<decltype(param)>(param)...);
+          };
 
           return Proxy_Function(
-            chaiscript::make_shared<dispatch::Proxy_Function_Base, dispatch::Proxy_Function_Callable_Impl<std::shared_ptr<Class> (Params...), decltype(call)>>(call));
+            chaiscript::make_shared<dispatch::Proxy_Function_Base, dispatch::Proxy_Function_Callable_Impl<Class (Params...), decltype(call)>>(call));
         }
     }
   }

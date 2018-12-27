@@ -1,7 +1,7 @@
 // This file is distributed under the BSD License.
 // See "license.txt" for details.
 // Copyright 2009-2012, Jonathan Turner (jonathan@emptycrate.com)
-// Copyright 2009-2017, Jason Turner (jason@emptycrate.com)
+// Copyright 2009-2018, Jason Turner (jason@emptycrate.com)
 // http://www.chaiscript.com
 
 // This is an open source non-commercial project. Dear PVS-Studio, please check it.
@@ -17,6 +17,7 @@
 #ifndef CHAISCRIPT_NO_THREADS
 #include <thread>
 #include <mutex>
+#include <shared_mutex>
 #else
 #ifndef CHAISCRIPT_NO_THREADS_WARNING
 #pragma message ("ChaiScript is compiling without thread safety.")
@@ -49,13 +50,13 @@ namespace chaiscript
         using unique_lock = std::unique_lock<T>;
 
       template<typename T>
-        using shared_lock = std::unique_lock<T>;
+        using shared_lock = std::shared_lock<T>;
 
       template<typename T>
         using lock_guard = std::lock_guard<T>;
 
 
-      using shared_mutex = std::mutex;
+      using std::shared_mutex;
 
       using std::mutex;
 
@@ -75,55 +76,40 @@ namespace chaiscript
 
             ~Thread_Storage()
             {
-              if (!destroyed) {
-                t().erase(this);
-              }
+              t().erase(this);
             }
 
-            inline const T *operator->() const
-            {
-              return &(t()[const_cast<Thread_Storage *>(this)]);
-            }
-
-            inline const T &operator*() const
-            {
-              return t()[const_cast<Thread_Storage *>(this)];
-            }
-
-            inline T *operator->()
+            inline const T *operator->() const noexcept
             {
               return &(t()[this]);
             }
 
-            inline T &operator*()
+            inline const T &operator*() const noexcept
             {
               return t()[this];
             }
 
-          private:
-            struct Map_Holder {
-              std::unordered_map<Thread_Storage<T> *, T> map;
-
-              Map_Holder() = default;
-              Map_Holder(const Map_Holder &) = delete;
-              Map_Holder(Map_Holder &&) = delete;
-              Map_Holder& operator=(Map_Holder &&) = delete;
-              Map_Holder& operator=(const Map_Holder &&) = delete;
-              ~Map_Holder() {
-                // here is the theory:
-                //   * If the Map_Holder is destroyed before the Thread_Storage, a flag will get set
-                //   * If destroyed after the Thread_Storage, the * will have been removed from `map` and nothing will happen
-                for(auto &elem : map) { elem.first->destroyed = true; }
-              }
-            };
-
-            static std::unordered_map<Thread_Storage<T> *, T> &t()
+            inline T *operator->() noexcept
             {
-              thread_local Map_Holder my_map;
-              return my_map.map;
+              return &(t()[this]);
             }
 
-            bool destroyed{false};
+            inline T &operator*() noexcept
+            {
+              return t()[this];
+            }
+
+
+            void *m_key;
+
+          private:
+            /// todo: is it valid to make this noexcept? The allocation could fail, but if it
+            /// does there is no possible way to recover
+            static std::unordered_map<const void*, T> &t() noexcept
+            {
+              static thread_local std::unordered_map<const void *, T> my_t;
+              return my_t;
+            }
         };
 
 #else // threading disabled
@@ -131,25 +117,25 @@ namespace chaiscript
       class unique_lock 
       {
         public:
-          explicit unique_lock(T &) {}
-          void lock() {}
-          void unlock() {}
+          constexpr explicit unique_lock(T &) noexcept {}
+          constexpr void lock() noexcept {}
+          constexpr void unlock() noexcept {}
       };
 
       template<typename T>
       class shared_lock 
       {
         public:
-          explicit shared_lock(T &) {}
-          void lock() {}
-          void unlock() {}
+          constexpr explicit shared_lock(T &) noexcept {}
+          constexpr void lock() noexcept {}
+          constexpr void unlock() noexcept {}
       };
 
       template<typename T>
       class lock_guard 
       {
         public:
-          explicit lock_guard(T &) {}
+          constexpr explicit lock_guard(T &) noexcept {}
       };
 
       class shared_mutex { };
@@ -161,16 +147,16 @@ namespace chaiscript
         class Thread_Storage
         {
           public:
-            explicit Thread_Storage(void *)
+            constexpr explicit Thread_Storage() noexcept
             {
             }
 
-            inline T *operator->() const
+            constexpr inline T *operator->() const noexcept
             {
               return &obj;
             }
 
-            inline T &operator*() const
+            constexpr inline T &operator*() const noexcept
             {
               return obj;
             }

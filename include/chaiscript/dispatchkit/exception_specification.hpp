@@ -1,7 +1,7 @@
 // This file is distributed under the BSD License.
 // See "license.txt" for details.
 // Copyright 2009-2012, Jonathan Turner (jonathan@emptycrate.com)
-// Copyright 2009-2017, Jason Turner (jason@emptycrate.com)
+// Copyright 2009-2018, Jason Turner (jason@emptycrate.com)
 // http://www.chaiscript.com
 
 // This is an open source non-commercial project. Dear PVS-Studio, please check it.
@@ -46,7 +46,7 @@ namespace chaiscript
       {
         void handle(const Boxed_Value &bv, const Dispatch_Engine &t_engine) override
         {
-          (void)std::initializer_list<int>{(throw_type<T>(bv, t_engine), 0)...};
+          (throw_type<T>(bv, t_engine), ...);
         }
       };
   }
@@ -101,7 +101,7 @@ namespace chaiscript
   ///
   /// \sa chaiscript::exception_specification for creation of chaiscript::Exception_Handler objects
   /// \sa \ref exceptions
-  typedef std::shared_ptr<detail::Exception_Handler_Base> Exception_Handler;
+  using Exception_Handler = std::shared_ptr<detail::Exception_Handler_Base>;
 
   /// \brief creates a chaiscript::Exception_Handler which handles one type of exception unboxing
   /// \sa \ref exceptions

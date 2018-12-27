@@ -1,7 +1,7 @@
 // This file is distributed under the BSD License.
 // See "license.txt" for details.
 // Copyright 2009-2012, Jonathan Turner (jonathan@emptycrate.com)
-// Copyright 2009-2017, Jason Turner (jason@emptycrate.com)
+// Copyright 2009-2018, Jason Turner (jason@emptycrate.com)
 // http://www.chaiscript.com
 
 // This is an open source non-commercial project. Dear PVS-Studio, please check it.
@@ -832,7 +832,7 @@ namespace chaiscript
     public:
       ChaiScript(std::vector<std::string> t_modulepaths = {},
           std::vector<std::string> t_usepaths = {},
-          const std::vector<Options> &t_opts = {})
+          const std::vector<Options> &t_opts = chaiscript::default_options())
         : ChaiScript_Basic(
             chaiscript::Std_Lib::library(),
             std::make_unique<parser::ChaiScript_Parser<eval::Noop_Tracer, optimizer::Optimizer_Default>>(),

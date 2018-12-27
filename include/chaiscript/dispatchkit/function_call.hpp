@@ -1,7 +1,7 @@
 // This file is distributed under the BSD License.
 // See "license.txt" for details.
 // Copyright 2009-2012, Jonathan Turner (jonathan@emptycrate.com)
-// Copyright 2009-2017, Jason Turner (jason@emptycrate.com)
+// Copyright 2009-2018, Jason Turner (jason@emptycrate.com)
 // http://www.chaiscript.com
 
 // This is an open source non-commercial project. Dear PVS-Studio, please check it.
@@ -18,7 +18,6 @@
 #include "boxed_cast.hpp"
 #include "function_call_detail.hpp"
 #include "proxy_functions.hpp"
-#include "callable_traits.hpp"
 
 namespace chaiscript {
 class Boxed_Value;
@@ -32,6 +31,15 @@ namespace chaiscript
 {
   namespace dispatch
   {
+    namespace detail
+    {
+      template<typename Ret, typename ... Param>
+        constexpr auto arity(Ret (*)(Param...)) noexcept
+      {
+        return sizeof...(Param);
+      }
+    }
+
     /// Build a function caller that knows how to dispatch on a set of functions
     /// example:
     /// std::function<void (int)> f =
@@ -43,7 +51,7 @@ namespace chaiscript
       {
         const bool has_arity_match = std::any_of(funcs.begin(), funcs.end(),
             [](const Const_Proxy_Function &f) {
-              return f->get_arity() == -1 || size_t(f->get_arity()) == chaiscript::dispatch::detail::Arity<FunctionType>::arity;
+              return f->get_arity() == -1 || size_t(f->get_arity()) == detail::arity(static_cast<FunctionType *>(nullptr));
             });
 
         if (!has_arity_match) {

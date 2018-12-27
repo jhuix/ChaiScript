@@ -1,7 +1,7 @@
 // This file is distributed under the BSD License.
 // See "license.txt" for details.
 // Copyright 2009-2012, Jonathan Turner (jonathan@emptycrate.com)
-// Copyright 2009-2017, Jason Turner (jason@emptycrate.com)
+// Copyright 2009-2018, Jason Turner (jason@emptycrate.com)
 // http://www.chaiscript.com
 
 #ifndef CHAISCRIPT_DYNAMIC_OBJECT_DETAIL_HPP_
@@ -71,7 +71,7 @@ namespace chaiscript
           Dynamic_Object_Function &operator=(const Dynamic_Object_Function) = delete;
           Dynamic_Object_Function(Dynamic_Object_Function &) = delete;
 
-          bool operator==(const Proxy_Function_Base &f) const override
+          bool operator==(const Proxy_Function_Base &f) const noexcept override
           {
             if (const auto *df = dynamic_cast<const Dynamic_Object_Function *>(&f))
             {
@@ -81,9 +81,9 @@ namespace chaiscript
             }
           }
 
-          bool is_attribute_function() const override { return m_is_attribute; } 
+          bool is_attribute_function() const noexcept override { return m_is_attribute; } 
 
-          bool call_match(const std::vector<Boxed_Value> &vals, const Type_Conversions_State &t_conversions) const override
+          bool call_match(const Function_Params &vals, const Type_Conversions_State &t_conversions) const noexcept override
           {
             if (dynamic_object_typename_match(vals, m_type_name, m_ti, t_conversions))
             {
@@ -99,7 +99,7 @@ namespace chaiscript
           }
 
         protected:
-          Boxed_Value do_call(const std::vector<Boxed_Value> &params, const Type_Conversions_State &t_conversions) const override
+          Boxed_Value do_call(const Function_Params &params, const Type_Conversions_State &t_conversions) const override
           {
             if (dynamic_object_typename_match(params, m_type_name, m_ti, t_conversions))
             {
@@ -109,7 +109,7 @@ namespace chaiscript
             } 
           }
 
-          bool compare_first_type(const Boxed_Value &bv, const Type_Conversions_State &t_conversions) const override
+          bool compare_first_type(const Boxed_Value &bv, const Type_Conversions_State &t_conversions) const noexcept override
           {
             return dynamic_object_typename_match(bv, m_type_name, m_ti, t_conversions);
           }
@@ -127,7 +127,7 @@ namespace chaiscript
           }
 
           bool dynamic_object_typename_match(const Boxed_Value &bv, const std::string &name,
-              const std::unique_ptr<Type_Info> &ti, const Type_Conversions_State &t_conversions) const
+              const std::unique_ptr<Type_Info> &ti, const Type_Conversions_State &t_conversions) const noexcept
           {
             if (bv.get_type_info().bare_equal(m_doti))
             {
@@ -148,8 +148,8 @@ namespace chaiscript
 
           }
 
-          bool dynamic_object_typename_match(const std::vector<Boxed_Value> &bvs, const std::string &name,
-              const std::unique_ptr<Type_Info> &ti, const Type_Conversions_State &t_conversions) const
+          bool dynamic_object_typename_match(const Function_Params &bvs, const std::string &name,
+              const std::unique_ptr<Type_Info> &ti, const Type_Conversions_State &t_conversions) const noexcept
           {
             if (!bvs.empty())
             {
@@ -199,28 +199,28 @@ namespace chaiscript
             return std::vector<Type_Info>(begin, end);
           }
 
-          bool operator==(const Proxy_Function_Base &f) const override
+          bool operator==(const Proxy_Function_Base &f) const noexcept override
           {
             const Dynamic_Object_Constructor *dc = dynamic_cast<const Dynamic_Object_Constructor*>(&f);
             return (dc != nullptr) && dc->m_type_name == m_type_name && (*dc->m_func) == (*m_func);
           }
 
-          bool call_match(const std::vector<Boxed_Value> &vals, const Type_Conversions_State &t_conversions) const override
+          bool call_match(const Function_Params &vals, const Type_Conversions_State &t_conversions) const override
           {
             std::vector<Boxed_Value> new_vals{Boxed_Value(Dynamic_Object(m_type_name))};
             new_vals.insert(new_vals.end(), vals.begin(), vals.end());
 
-            return m_func->call_match(new_vals, t_conversions);
+            return m_func->call_match(Function_Params{new_vals}, t_conversions);
           }
 
         protected:
-          Boxed_Value do_call(const std::vector<Boxed_Value> &params, const Type_Conversions_State &t_conversions) const override
+          Boxed_Value do_call(const Function_Params &params, const Type_Conversions_State &t_conversions) const override
           {
             auto bv = Boxed_Value(Dynamic_Object(m_type_name), true);
             std::vector<Boxed_Value> new_params{bv};
             new_params.insert(new_params.end(), params.begin(), params.end());
 
-            (*m_func)(new_params, t_conversions);
+            (*m_func)(Function_Params{new_params}, t_conversions);
 
             return bv;
           }

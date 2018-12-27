@@ -4,12 +4,8 @@ if(NOT ${CMAKE_VERSION} VERSION_LESS "3.1")
   cmake_policy(SET CMP0054 NEW)
 endif()
 
-IF(BIICODE)
-  INIT_BIICODE_BLOCK()
-  ADD_BIICODE_TARGETS()
-ELSE()
-  # Your regular CMakeLists configuration here
-
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 project(chaiscript)
 
@@ -49,12 +45,14 @@ if(CMAKE_COMPILER_IS_GNUCC OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
   if(ENABLE_ADDRESS_SANITIZER)
     add_definitions(-fsanitize=address -g)
     set(LINKER_FLAGS "${LINKER_FLAGS} -fsanitize=address")
+
+    option(BUILD_LIBFUZZ_TESTER "Build libfuzzer tool" FALSE)
   endif()
 
   option(ENABLE_MEMORY_SANITIZER "Enable memory sanitizer testing in gcc/clang" FALSE)
   if(ENABLE_MEMORY_SANITIZER)
-    add_definitions(-fsanitize=memory -g)
-    set(LINKER_FLAGS "${LINKER_FLAGS} -fsanitize=memory")
+    add_definitions(-fsanitize=memory -fsanitize-memory-track-origins -g)
+    set(LINKER_FLAGS "${LINKER_FLAGS} -fsanitize=memory -fsanitize-memory-track-origins ")
   endif()
 
   option(ENABLE_UNDEFINED_SANITIZER "Enable undefined behavior sanitizer testing in gcc/clang" FALSE)
@@ -102,7 +100,7 @@ set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/license.txt")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/readme.md")
 set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/description.txt")
 
-set(CPACK_PACKAGE_VERSION_MAJOR 6)
+set(CPACK_PACKAGE_VERSION_MAJOR 7)
 set(CPACK_PACKAGE_VERSION_MINOR 0)
 set(CPACK_PACKAGE_VERSION_PATCH 0)
 
@@ -123,6 +121,7 @@ configure_file(Doxyfile.in ${CMAKE_BINARY_DIR}/Doxyfile)
 
 include(CTest)
 include(CPack)
+include(cmake/Catch.cmake)
 
 if(NOT MINGW)
   find_library(READLINE_LIBRARY NAMES readline PATH /usr/lib /usr/local/lib /opt/local/lib)
@@ -149,17 +148,14 @@ endif()
 if(CMAKE_COMPILER_IS_GNUCC)
   execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
 
-  if(GCC_VERSION VERSION_LESS 4.9)
-    set(CPP11_FLAG "-std=c++1y")
-  else()
-    set(CPP11_FLAG "-std=c++14")
-  endif()
-else()
-  set(CPP11_FLAG "-std=c++14")
+  set(CPP17_FLAG "-std=c++1z")
 endif()
 
 if(MSVC)
-  add_definitions(/W4 /w14545 /w34242 /w34254 /w34287 /w44263 /w44265 /w44296 /w44311 /w44826 /we4289 /w14546 /w14547 /w14549 /w14555 /w14619 /w14905 /w14906 /w14928)
+  add_definitions(/std:c++latest /W4 /w14545 /w34242 /w34254 /w34287 /w44263 /w44265 /w44296 /w44311 /w44826 /we4289 /w14546 /w14547 /w14549 /w14555 /w14619 /w14905 /w14906 /w14928)
+
+  add_definitions(/std:c++17)
+
 
   if (MSVC_VERSION STREQUAL "1800")
     # VS2013 doesn't have magic statics
@@ -169,7 +165,7 @@ if(MSVC)
     add_definitions(/w34062)
   endif()
 
-  add_definitions(/bigobj)
+  add_definitions(/bigobj /permissive-)
   # Note on MSVC compiler flags.
   # The code base selective disables warnings as necessary when the compiler is complaining too much
   # about something that is perfectly valid, or there is simply no technical way around it
@@ -179,10 +175,10 @@ if(MSVC)
   # how to workaround or fix the error. So I'm disabling it globally.
   add_definitions(/wd4503)
 else()
-  add_definitions(-Wall -Wextra -Wconversion -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Wcast-align -Wcast-qual -Wunused -Woverloaded-virtual  -pedantic ${CPP11_FLAG})
+  add_definitions(-Wall -Wextra -Wconversion -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Wcast-align -Wcast-qual -Wunused -Woverloaded-virtual -Wno-noexcept-type -Wpedantic ${CPP17_FLAG})
 
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    add_definitions(-Weverything -Wno-c++98-compat-pedantic  -Wno-c++98-compat -Wno-documentation -Wno-switch-enum -Wno-weak-vtables -Wno-missing-prototypes -Wno-padded -Wno-missing-noreturn -Wno-exit-time-destructors -Wno-documentation-unknown-command)
+    add_definitions(-Weverything -Wno-c++98-compat-pedantic  -Wno-c++98-compat -Wno-documentation -Wno-switch-enum -Wno-weak-vtables -Wno-missing-prototypes -Wno-padded -Wno-missing-noreturn -Wno-exit-time-destructors -Wno-documentation-unknown-command -Wno-unused-template -Wno-undef )
   else()
     add_definitions(-Wnoexcept)
   endif()
@@ -197,12 +193,12 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 
   if(USE_LIBCXX)
     add_definitions(-stdlib=libc++)
-    set(LINKER_FLAGS "${LINKER_FLAGS} ${CPP11_FLAG} -stdlib=libc++")
+    set(LINKER_FLAGS "${LINKER_FLAGS} ${CPP17_FLAG} -stdlib=libc++")
   else()
-    set(LINKER_FLAGS "${LINKER_FLAGS} ${CPP11_FLAG}")
+    set(LINKER_FLAGS "${LINKER_FLAGS} ${CPP17_FLAG}")
   endif()
 elseif(CMAKE_COMPILER_IS_GNUCC)
-  set(LINKER_FLAGS "${LINKER_FLAGS} ${CPP11_FLAG}")
+  set(LINKER_FLAGS "${LINKER_FLAGS} ${CPP17_FLAG}")
 endif()
 
 # limitations in MinGW require us to make an optimized build
@@ -268,8 +264,8 @@ add_executable(chai src/main.cpp ${Chai_INCLUDES})
 target_link_libraries(chai ${LIBS} ${CHAISCRIPT_LIBS})
 
 if(BUILD_SAMPLES)
-  add_executable(example samples/example.cpp)
-  target_link_libraries(example ${LIBS})
+  add_executable(sanity_checks src/sanity_checks.cpp)
+  target_link_libraries(sanity_checks ${LIBS})
   add_executable(test_num_exceptions samples/test_num_exceptions.cpp)
   target_link_libraries(test_num_exceptions ${LIBS} ${CHAISCRIPT_LIBS})
   add_executable(memory_leak_test samples/memory_leak_test.cpp)
@@ -293,6 +289,7 @@ if(BUILD_MODULES)
   set(MODULES stl_extra)
 endif()
 
+
 file(GLOB UNIT_TESTS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/unittests/ ${CMAKE_CURRENT_SOURCE_DIR}/unittests/*.chai ${CMAKE_CURRENT_SOURCE_DIR}/unittests/3.x/*.chai)
 list(SORT UNIT_TESTS)
 
@@ -305,32 +302,17 @@ if (RUN_FUZZY_TESTS)
   file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/unittests")
 
   execute_process(
-    COMMAND ${CMAKE_COMMAND} -E tar xjf ${CMAKE_CURRENT_SOURCE_DIR}/unittests/fuzzy_tests-2016-06-29.tar.bz2
+    COMMAND ${CMAKE_COMMAND} -E tar xjf ${CMAKE_CURRENT_SOURCE_DIR}/unittests/fuzzy_tests-2017-07-20.tar.bz2
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/unittests
     )
 
 
-  file(GLOB FUZZY_CRASH_TESTS RELATIVE ${CMAKE_BINARY_DIR}/unittests/ ${CMAKE_BINARY_DIR}/unittests/fuzzy_tests/crashes/id*)
-  list(SORT FUZZY_CRASH_TESTS)
+  file(GLOB FUZZY_TESTS RELATIVE ${CMAKE_BINARY_DIR}/unittests/ ${CMAKE_BINARY_DIR}/unittests/MINIMIZED/*)
+  list(SORT FUZZY_TESTS)
 
-  file(GLOB FUZZY_EXCEPTION_TESTS RELATIVE ${CMAKE_BINARY_DIR}/unittests/ ${CMAKE_BINARY_DIR}/unittests/fuzzy_tests/exceptions/id*)
-  list(SORT FUZZY_EXCEPTION_TESTS)
-
-
-  foreach(filename ${FUZZY_CRASH_TESTS})
+  foreach(filename ${FUZZY_TESTS})
     message(STATUS "Adding test ${filename}")
-    add_test(${filename} chai "-e" ${CMAKE_BINARY_DIR}/unittests/fuzzy_tests/crashes/unit_test.inc ${CMAKE_BINARY_DIR}/unittests/${filename})
-  endforeach()
-
-  set_property(TEST ${FUZZY_CRASH_TESTS}
-    PROPERTY ENVIRONMENT
-    "CHAI_USE_PATH=${CMAKE_BINARY_DIR}/unittests/"
-    "CHAI_MODULE_PATH=${CMAKE_CURRENT_BINARY_DIR}/"
-    )
-
-  foreach(filename ${FUZZY_EXCEPTION_TESTS})
-    message(STATUS "Adding test ${filename}")
-    add_test(${filename} chai "--exception" ${CMAKE_BINARY_DIR}/unittests/fuzzy_tests/exceptions/unit_test.inc ${CMAKE_BINARY_DIR}/unittests/${filename})
+    add_test(fuzz.${filename} chai "-e" "--exception" "--any-exception" ${CMAKE_CURRENT_SOURCE_DIR}/unittests/fuzz_unit_test.inc ${CMAKE_BINARY_DIR}/unittests/${filename})
   endforeach()
 
   set_property(TEST ${FUZZY_EXCEPTION_TESTS}
@@ -343,37 +325,6 @@ endif()
 
 
 if(BUILD_TESTING)
-
-  # Add catch tests macro
-  macro(ADD_CATCH_TESTS executable)
-    if (MSVC)
-      file(TO_NATIVE_PATH "${QT_LIBRARY_DIR}" QT_LIB_PATH)
-      set(NEWPATH "${QT_LIB_PATH};$ENV{PATH}")
-    else()
-      set(NEWPATH $ENV{PATH})
-    endif()
-
-    get_target_property(target_files ${executable} SOURCES)
-
-    foreach(source ${target_files})
-      if(NOT "${source}" MATCHES "/moc_.*cxx")
-        string(REGEX MATCH .*cpp source "${source}")
-        if(source)
-          file(READ "${source}" contents)
-          string(REGEX MATCHALL "TEST_CASE\\([ ]*\"[^\"]+\"" found_tests ${contents})
-          foreach(hit ${found_tests})
-            string(REGEX REPLACE "TEST_CASE\\([ ]*(\"[^\"]+\").*" "\\1" test_name ${hit})
-            add_test(compiled.${test_name} "${executable}" ${test_name})
-            set_tests_properties(compiled.${test_name} PROPERTIES TIMEOUT 660 ENVIRONMENT "PATH=${NEWPATH}")
-          endforeach()
-        endif()
-      endif()
-    endforeach()
-  endmacro()
-
-
-
-
 
   option(UNIT_TEST_LIGHT "Unit tests light (expect module loading failures)" FALSE)
 
@@ -432,7 +383,7 @@ if(BUILD_TESTING)
   if(NOT UNIT_TEST_LIGHT)
     add_executable(compiled_tests unittests/compiled_tests.cpp)
     target_link_libraries(compiled_tests ${LIBS} ${CHAISCRIPT_LIBS})
-    ADD_CATCH_TESTS(compiled_tests)
+    catch_discover_tests(compiled_tests TEST_PREFIX "compiled.")
 
     add_executable(static_chaiscript_test unittests/static_chaiscript.cpp)
     target_link_libraries(static_chaiscript_test ${LIBS})
@@ -479,6 +430,15 @@ if(BUILD_TESTING)
   endif()
 endif()
 
+
+
+if(BUILD_LIBFUZZ_TESTER)
+  add_executable(fuzzer src/libfuzzer_client.cpp src/sha3.cpp)
+  target_compile_options(fuzzer PRIVATE "-fsanitize=fuzzer,address")
+  target_link_libraries(fuzzer PRIVATE ${LIBS} "-fsanitize=fuzzer,address")
+endif()
+
+
 install(TARGETS chai chaiscript_stdlib-${CHAI_VERSION} ${MODULES} RUNTIME DESTINATION bin LIBRARY DESTINATION lib/chaiscript)
 
 install(DIRECTORY include/chaiscript DESTINATION include
@@ -503,5 +463,3 @@ install(FILES "${chaiscript_BINARY_DIR}/lib/pkgconfig/chaiscript.pc"
         DESTINATION lib/pkgconfig)
 
     
-ENDIF()
-

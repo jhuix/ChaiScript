@@ -1,7 +1,7 @@
 // This file is distributed under the BSD License.
 // See "license.txt" for details.
 // Copyright 2009-2012, Jonathan Turner (jonathan@emptycrate.com)
-// Copyright 2009-2017, Jason Turner (jason@emptycrate.com)
+// Copyright 2009-2018, Jason Turner (jason@emptycrate.com)
 // http://www.chaiscript.com
 
 #ifndef CHAISCRIPT_POSIX_HPP_
@@ -41,25 +41,12 @@ namespace chaiscript
         struct DLSym
         {
           DLSym(DLModule &t_mod, const std::string &t_symbol)
-            : m_symbol(cast_symbol(dlsym(t_mod.m_data, t_symbol.c_str())))
+            : m_symbol(reinterpret_cast<T>(dlsym(t_mod.m_data, t_symbol.c_str())))
           {
             if (!m_symbol)
             {
               throw chaiscript::exception::load_module_error(dlerror());
             }
-          }
-
-          static T cast_symbol(void *p)
-          {
-            union cast_union
-            {
-              T func_ptr;
-              void *in_ptr;
-            };
-
-            cast_union c;
-            c.in_ptr = p;
-            return c.func_ptr;
           }
 
           T m_symbol;

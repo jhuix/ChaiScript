@@ -1,7 +1,7 @@
 // This file is distributed under the BSD License.
 // See "license.txt" for details.
 // Copyright 2009-2012, Jonathan Turner (jonathan@emptycrate.com)
-// Copyright 2009-2017, Jason Turner (jason@emptycrate.com)
+// Copyright 2009-2018, Jason Turner (jason@emptycrate.com)
 // http://www.chaiscript.com
 
 // This is an open source non-commercial project. Dear PVS-Studio, please check it.
@@ -27,7 +27,7 @@ namespace chaiscript
     // Cast_Helper_Inner helper classes
 
     template<typename T>
-      T* throw_if_null(T *t)
+      constexpr T* throw_if_null(T *t)
       {
         if (t) { return t; }
         throw std::runtime_error("Attempted to dereference null Boxed_Value");

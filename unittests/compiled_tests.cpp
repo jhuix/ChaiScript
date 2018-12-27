@@ -4,7 +4,7 @@
 
 #ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable : 4062 4242 4640 4702 6330 28251)
+#pragma warning(disable : 4062 4242 4566 4640 4702 6330 28251)
 #endif
 
 
@@ -12,6 +12,8 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic ignored "-Wparentheses"
+// This one is necessary for the const return non-reference test
+#pragma GCC diagnostic ignored "-Wignored-qualifiers"
 #endif
 
 
@@ -202,6 +204,41 @@ TEST_CASE("Throw int or double")
   }
 }
 
+TEST_CASE("Deduction of pointer return types")
+{
+  int val = 5;
+  int *val_ptr = &val;
+  auto &val_ptr_ref = val_ptr;
+  const auto &val_ptr_const_ref = val_ptr;
+
+  auto get_val_ptr = [&]() -> int * { return val_ptr; };
+  auto get_val_const_ptr = [&]() -> int const * { return val_ptr; };
+  auto get_val_ptr_ref = [&]() -> int *& { return val_ptr_ref; };
+  auto get_val_ptr_const_ref = [&]() -> int * const & { return val_ptr_const_ref; };
+//  auto get_val_const_ptr_const_ref = [ref=std::cref(val_ptr)]() -> int const * const & { return ref.get(); };
+
+  chaiscript::ChaiScript_Basic chai(create_chaiscript_stdlib(), create_chaiscript_parser());
+  chai.add(chaiscript::fun(get_val_ptr), "get_val_ptr");
+  chai.add(chaiscript::fun(get_val_const_ptr), "get_val_const_ptr");
+  chai.add(chaiscript::fun(get_val_ptr_ref), "get_val_ptr_ref");
+  chai.add(chaiscript::fun(get_val_ptr_const_ref), "get_val_ptr_const_ref");
+//  chai.add(chaiscript::fun(get_val_const_ptr_const_ref), "get_val_const_ptr_const_ref");
+
+  CHECK(chai.eval<int *>("get_val_ptr()") == &val);
+  CHECK(*chai.eval<int *>("get_val_ptr()") == val);
+  CHECK(chai.eval<int const *>("get_val_const_ptr()") == &val);
+  CHECK(*chai.eval<int const *>("get_val_const_ptr()") == val);
+
+  // note that we cannot maintain the references here,
+  // chaiscript internals cannot handle that, effectively pointer to pointer
+  CHECK(chai.eval<int *>("get_val_ptr_ref()") == &val);
+  CHECK(*chai.eval<int *>("get_val_ptr_ref()") == val);
+  CHECK(chai.eval<int *>("get_val_ptr_const_ref()") == &val);
+  CHECK(*chai.eval<int *>("get_val_ptr_const_ref()") == val);
+//  CHECK(chai.eval<int const *>("get_val_const_ptr_const_ref()") == &val);
+}
+
+
 TEST_CASE("Throw a runtime_error")
 {
   chaiscript::ChaiScript_Basic chai(create_chaiscript_stdlib(),create_chaiscript_parser());
@@ -350,7 +387,29 @@ TEST_CASE("Functor cast")
   CHECK(d == 3 * 6);
 }
 
+TEST_CASE("Non-ASCII characters in the middle of string")
+{
+  chaiscript::ChaiScript_Basic chai(create_chaiscript_stdlib(),create_chaiscript_parser());
+  CHECK_THROWS_AS(chai.eval<std::string>("prin\xeft \"Hello World\""), chaiscript::exception::eval_error);
+}
 
+TEST_CASE("Non-ASCII characters in the beginning of string")
+{
+    chaiscript::ChaiScript_Basic chai(create_chaiscript_stdlib(),create_chaiscript_parser());
+    CHECK_THROWS_AS(chai.eval<std::string>("\xefprint \"Hello World\""), chaiscript::exception::eval_error);
+}
+
+TEST_CASE("Non-ASCII characters in the end of string")
+{
+    chaiscript::ChaiScript_Basic chai(create_chaiscript_stdlib(),create_chaiscript_parser());
+    CHECK_THROWS_AS(chai.eval<std::string>("print \"Hello World\"\xef"), chaiscript::exception::eval_error);
+}
+
+TEST_CASE("BOM in string")
+{
+    chaiscript::ChaiScript_Basic chai(create_chaiscript_stdlib(),create_chaiscript_parser());
+    CHECK_THROWS_AS(chai.eval<std::string>("\xef\xbb\xbfprint \"Hello World\""), chaiscript::exception::eval_error);
+}
 
 int set_state_test_myfun()
 {
@@ -380,7 +439,7 @@ TEST_CASE("Set and restore chai state")
   // set state should have reverted the state of the functions and dropped
   // the 'myfun'
 
-  CHECK_THROWS_AS(chai.eval<int>("myfun()"), chaiscript::exception::eval_error &);
+  CHECK_THROWS_AS(chai.eval<int>("myfun()"), chaiscript::exception::eval_error);
 
   // set state should not affect the local variables
   CHECK(chai.eval<int>("i") == 1);
@@ -388,7 +447,7 @@ TEST_CASE("Set and restore chai state")
   // After resetting the locals we expect the 'i' to be gone
   chai.set_locals(locals);
 
-  CHECK_THROWS_AS(chai.eval<int>("i"), chaiscript::exception::eval_error &);
+  CHECK_THROWS_AS(chai.eval<int>("i"), chaiscript::exception::eval_error);
 }
 
 
@@ -466,8 +525,8 @@ TEST_CASE("Simultaneous ChaiScript tests")
     CHECK(chai.eval<int>("do_something(" + std::to_string(i) + ")") == i + 2);
     CHECK(chai2.eval<int>("do_something_else(" + std::to_string(i) + ")") == i * 2);
 
-    CHECK_THROWS_AS(chai2.eval("do_something(1)"), chaiscript::exception::eval_error &);
-    CHECK_THROWS_AS(chai2.eval("i"), chaiscript::exception::eval_error &);
+    CHECK_THROWS_AS(chai2.eval("do_something(1)"), chaiscript::exception::eval_error);
+    CHECK_THROWS_AS(chai2.eval("i"), chaiscript::exception::eval_error);
     CHECK_NOTHROW(chai2.eval("do_something_else(1)"));
   }
 }
@@ -1267,6 +1326,86 @@ TEST_CASE("Test reference member being registered")
   chai.add(chaiscript::var(Reference_MyClass(d)), "ref");
   chai.eval("ref.x = 2.3");
   CHECK(d == Approx(2.3));
+}
+
+TEST_CASE("Test unicode matches C++")
+{
+  chaiscript::ChaiScript_Basic chai(create_chaiscript_stdlib(),create_chaiscript_parser());
+  CHECK(u8"\U000000AC" == chai.eval<std::string>(R"("\U000000AC")"));
+  CHECK("\xF0\x9F\x8D\x8C" == chai.eval<std::string>(R"("\xF0\x9F\x8D\x8C")"));
+  CHECK(u8"\U0001F34C" == chai.eval<std::string>(R"("\U0001F34C")"));
+  CHECK(u8"\u2022" == chai.eval<std::string>(R"("\u2022")"));
+
+}
+
+
+const int add_3(const int &i)
+{
+  return i + 3;
+}
+
+TEST_CASE("Test returning by const non-reference")
+{
+  chaiscript::ChaiScript_Basic chai(create_chaiscript_stdlib(),create_chaiscript_parser());
+  // Note, C++ will not allow us to do this:
+  // chai.add(chaiscript::fun(&Reference_MyClass::x) , "x");
+  chai.add(chaiscript::fun(&add_3), "add_3");
+  auto v = chai.eval<int>("add_3(12)");
+  CHECK(v == 15);
+}
+
+
+struct MyException : std::runtime_error
+{
+  using std::runtime_error::runtime_error;
+  int value = 5;
+};
+
+void throws_a_thing()
+{
+  throw MyException("Hello World");
+}
+
+TEST_CASE("Test throwing and catching custom exception")
+{
+  chaiscript::ChaiScript_Basic chai(create_chaiscript_stdlib(),create_chaiscript_parser());
+  chai.add(chaiscript::user_type<MyException>(), "MyException");
+  chai.add(chaiscript::base_class<std::runtime_error, MyException>()); // be sure to register base class relationship
+  chai.add(chaiscript::fun(&throws_a_thing), "throws_a_thing");
+  chai.add(chaiscript::fun(&MyException::value), "value");
+
+  const auto s = chai.eval<std::string>("fun(){ try { throws_a_thing(); } catch (MyException ex) { return ex.what(); } }()");
+  CHECK(s == "Hello World");
+
+  // this has an explicit clone to prevent returning a pointer to the `value` from inside of MyException
+  const auto i = chai.eval<int>("fun(){ try { throws_a_thing(); } catch (MyException ex) { var v = clone(ex.value); print(v); return v; } }()");
+  CHECK(i == 5);
+}
+
+
+TEST_CASE("Test ability to get 'use' function from default construction")
+{
+  chaiscript::ChaiScript chai;
+  const auto use_function = chai.eval<std::function<chaiscript::Boxed_Value (const std::string &)>>("use");
+}
+
+TEST_CASE("Throw an exception when trying to add same conversion twice")
+{
+  struct my_int {
+      int value;
+      my_int(int val): value(val) {};
+  };
+
+  chaiscript::ChaiScript chai;
+  chai.add(chaiscript::type_conversion<int, my_int>([](int x) {
+      std::cout << "My_int type conversion 1\n";
+      return my_int(x);
+  }));
+  CHECK_THROWS_AS(chai.add(chaiscript::type_conversion<int, my_int>([](int x) {
+      std::cout << "My_int type conversion 2\n";
+      return my_int(x);
+  })), chaiscript::exception::conversion_error);
+
 }
 
 

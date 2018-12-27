@@ -1,7 +1,7 @@
 // This file is distributed under the BSD License.
 // See "license.txt" for details.
 // Copyright 2009-2012, Jonathan Turner (jonathan@emptycrate.com)
-// Copyright 2009-2017, Jason Turner (jason@emptycrate.com)
+// Copyright 2009-2018, Jason Turner (jason@emptycrate.com)
 // http://www.chaiscript.com
 
 // This is an open source non-commercial project. Dear PVS-Studio, please check it.
@@ -50,17 +50,17 @@ namespace chaiscript
 
         Dynamic_Object() = default;
 
-        bool is_explicit() const
+        bool is_explicit() const noexcept
         {
           return m_option_explicit;
         }
 
-        void set_explicit(const bool t_explicit)
+        void set_explicit(const bool t_explicit) noexcept
         {
           m_option_explicit = t_explicit;
         }
 
-        std::string get_type_name() const
+        const std::string &get_type_name() const noexcept
         {
           return m_type_name;
         }
